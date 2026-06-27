@@ -46,14 +46,14 @@ class ProviderAnalysisAgent:
                 llm = None
 
             self._crew_agent = Agent(
-            role="Provider Risk Analyst",
-            goal="Evaluate provider-level risk using fraud probability and provider behavior patterns",
-            backstory=(
-                "You review provider billing behavior, utilization patterns, and patient mix to "
-                "highlight unusual practices that may indicate fraud."
-            ),
-            verbose=False,
-            allow_delegation=False,
+                role="Provider Risk Analyst",
+                goal="Evaluate provider-level risk using fraud probability and provider behavior patterns",
+                backstory=(
+                    "You review provider billing behavior, utilization patterns, and patient mix to "
+                    "highlight unusual practices that may indicate fraud."
+                ),
+                verbose=False,
+                allow_delegation=False,
                 llm=llm,
             )
         return self._crew_agent

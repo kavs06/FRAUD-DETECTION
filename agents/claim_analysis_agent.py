@@ -47,14 +47,14 @@ class ClaimAnalysisAgent:
                 llm = None
 
             self._crew_agent = Agent(
-            role="Claim Pattern Analyst",
-            goal="Detect unusual claim-level patterns that are consistent with fraudulent billing",
-            backstory=(
-                "You examine reimbursement intensity, claim duration, and claim mix to find patterns "
-                "that stand out from the rest of the provider population."
-            ),
-            verbose=False,
-            allow_delegation=False,
+                role="Claim Pattern Analyst",
+                goal="Detect unusual claim-level patterns that are consistent with fraudulent billing",
+                backstory=(
+                    "You examine reimbursement intensity, claim duration, and claim mix to find patterns "
+                    "that stand out from the rest of the provider population."
+                ),
+                verbose=False,
+                allow_delegation=False,
                 llm=llm,
             )
         return self._crew_agent

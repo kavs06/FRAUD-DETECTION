@@ -45,14 +45,14 @@ class BeneficiaryAnalysisAgent:
                 llm = None
 
             self._crew_agent = Agent(
-            role="Beneficiary Risk Analyst",
-            goal="Assess beneficiary-level concentration and utilization patterns linked to provider fraud",
-            backstory=(
-                "You inspect beneficiary uniqueness, mortality burden, and patient concentration to identify "
-                "providers that have unusually concentrated or high-risk patient populations."
-            ),
-            verbose=False,
-            allow_delegation=False,
+                role="Beneficiary Risk Analyst",
+                goal="Assess beneficiary-level concentration and utilization patterns linked to provider fraud",
+                backstory=(
+                    "You inspect beneficiary uniqueness, mortality burden, and patient concentration to identify "
+                    "providers that have unusually concentrated or high-risk patient populations."
+                ),
+                verbose=False,
+                allow_delegation=False,
                 llm=llm,
             )
         return self._crew_agent

@@ -23,6 +23,7 @@ from utils.investigation_utils import (
     resolve_row_reference_stats,
     save_combined_reports,
     save_provider_report,
+    validate_provider_inputs,
 )
 
 logger = logging.getLogger(__name__)
@@ -181,6 +182,9 @@ class FraudInvestigationCrew:
             )
             self.claims_df = merge_beneficiary(claims_all, beneficiary_cleaned)
         else:
+            logger.warning(
+                "Beneficiary data not found; continuing with claim data only (no beneficiary enrichment)."
+            )
             self.claims_df = claims_all
 
         logger.info("Prepared claims dataframe with shape %s", self.claims_df.shape)
@@ -364,11 +368,15 @@ class FraudInvestigationCrew:
 
         Uses deterministic specialist agents for scoring and writes JSON reports.
         """
+        logger.info("Loading provider data")
         if claims_df is not None:
             self.claims_df = claims_df
+            logger.info("Using supplied claims_df with shape %s", claims_df.shape)
 
         provider_df = provider_df.copy()
         fraud_probabilities = fraud_probabilities.copy()
+
+        validate_provider_inputs(provider_df, fraud_probabilities)
 
         if "Provider" not in provider_df.columns:
             raise ValueError("provider_df must include a Provider column")
@@ -380,6 +388,17 @@ class FraudInvestigationCrew:
 
         provider_df = self._enrich_provider_df(provider_df)
         provider_df = provider_df.merge(fraud_probabilities, on="Provider", how="left")
+
+        flagged_count = int((provider_df["fraud_probability"].fillna(0) >= threshold).sum())
+        if flagged_count == 0:
+            logger.warning(
+                "No providers above fraud threshold %.2f; writing empty investigation bundle",
+                threshold,
+            )
+            save_combined_reports([], self.output_dir)
+            logger.info("Investigation completed")
+            return []
+
         reference_stats = build_reference_stats(provider_df, REFERENCE_COLUMNS)
 
         reports: list[dict[str, Any]] = []
@@ -389,12 +408,20 @@ class FraudInvestigationCrew:
             if fraud_probability < threshold:
                 continue
 
+            logger.info("Investigating provider %s (fraud_probability=%.4f)", provider_id, fraud_probability)
             provider_row = self._build_provider_row(row.to_dict())
             row_reference_stats = resolve_row_reference_stats(provider_row, reference_stats)
 
+            logger.info("Running Provider Analysis Agent")
             provider_findings = self.provider_agent.analyze(provider_row, row_reference_stats)
+
+            logger.info("Running Claim Analysis Agent")
             claim_findings = self.claim_agent.analyze(provider_row, row_reference_stats)
+
+            logger.info("Running Beneficiary Analysis Agent")
             beneficiary_findings = self.beneficiary_agent.analyze(provider_row, row_reference_stats)
+
+            logger.info("Running Investigation Coordinator")
             coordinator_findings = self.coordinator_agent.analyze(
                 provider_row,
                 [provider_findings, claim_findings, beneficiary_findings],
@@ -419,10 +446,13 @@ class FraudInvestigationCrew:
             }
             reports.append(report)
             save_provider_report(report, self.output_dir)
-            logger.info("Saved investigation report for provider %s", provider_id)
 
         save_combined_reports(reports, self.output_dir)
-        logger.info("Investigation complete: %s provider(s) above threshold %.2f", len(reports), threshold)
+        logger.info(
+            "Investigation completed: %s provider(s) investigated above threshold %.2f",
+            len(reports),
+            threshold,
+        )
         return reports
 
     def run_crew(

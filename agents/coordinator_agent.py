@@ -26,14 +26,14 @@ class InvestigationCoordinatorAgent:
                 llm = None
 
             self._crew_agent = Agent(
-            role="Investigation Coordinator",
-            goal="Combine specialist findings into a structured fraud investigation report",
-            backstory=(
-                "You synthesize provider, claim, and beneficiary evidence into a concise investigation package "
-                "that is ready for human review."
-            ),
-            verbose=False,
-            allow_delegation=False,
+                role="Investigation Coordinator",
+                goal="Combine specialist findings into a structured fraud investigation report",
+                backstory=(
+                    "You synthesize provider, claim, and beneficiary evidence into a concise investigation package "
+                    "that is ready for human review."
+                ),
+                verbose=False,
+                allow_delegation=False,
                 llm=llm,
             )
         return self._crew_agent

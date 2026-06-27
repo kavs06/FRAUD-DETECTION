@@ -16,6 +16,20 @@ DEFAULT_HIGH_PERCENTILE = 0.95
 DEFAULT_LOW_PERCENTILE = 0.05
 DEFAULT_ZSCORE_THRESHOLD = 2.0
 
+REQUIRED_REPORT_FIELDS = {"Provider", "fraud_probability", "investigation_summary", "tasks"}
+REQUIRED_COORDINATOR_FIELDS = {
+    "Fraud Score",
+    "Provider Risk",
+    "Claim Risk",
+    "Beneficiary Risk",
+    "Evidence",
+    "Recommendation",
+    "Priority",
+    "Confidence",
+}
+REQUIRED_PROVIDER_DF_COLUMNS = {"Provider", "TotalClaims", "UniquePatients", "InpatientRatio"}
+REQUIRED_PROBABILITY_COLUMNS = {"Provider", "fraud_probability"}
+
 
 def create_probability_frame(
     provider_df: pd.DataFrame,
@@ -192,20 +206,100 @@ def score_from_evidence(
     return round(min(1.0, score), 3)
 
 
+def validate_provider_inputs(
+    provider_df: pd.DataFrame,
+    fraud_probabilities: pd.DataFrame,
+) -> None:
+    """Validate required columns exist before running the investigation pipeline."""
+    if provider_df.empty:
+        raise ValueError("provider_df is empty; no providers available for investigation")
+
+    missing_provider_cols = REQUIRED_PROVIDER_DF_COLUMNS - set(provider_df.columns)
+    if missing_provider_cols:
+        raise ValueError(
+            f"provider_df is missing required columns: {sorted(missing_provider_cols)}"
+        )
+
+    if fraud_probabilities.empty:
+        raise ValueError("fraud_probabilities is empty; fraud scores are required")
+
+    missing_probability_cols = REQUIRED_PROBABILITY_COLUMNS - set(fraud_probabilities.columns)
+    if missing_probability_cols:
+        raise ValueError(
+            f"fraud_probabilities is missing required columns: {sorted(missing_probability_cols)}"
+        )
+
+
+def validate_investigation_report(report: dict[str, Any]) -> None:
+    """
+    Validate that a report matches the expected investigation schema.
+
+    Raises ValueError when required fields are missing or malformed.
+    """
+    missing_top_level = REQUIRED_REPORT_FIELDS - set(report.keys())
+    if missing_top_level:
+        raise ValueError(f"Report missing top-level fields: {sorted(missing_top_level)}")
+
+    summary = report.get("investigation_summary")
+    if not isinstance(summary, dict):
+        raise ValueError("investigation_summary must be a dictionary")
+
+    coordinator = summary.get("coordinator")
+    if not isinstance(coordinator, dict):
+        raise ValueError("investigation_summary.coordinator must be a dictionary")
+
+    missing_coordinator = REQUIRED_COORDINATOR_FIELDS - set(coordinator.keys())
+    if missing_coordinator:
+        raise ValueError(
+            f"Coordinator report missing required fields: {sorted(missing_coordinator)}"
+        )
+
+    evidence = coordinator.get("Evidence")
+    if not isinstance(evidence, list):
+        raise ValueError("Evidence must be a list (use [] when no evidence is found)")
+
+    recommendation = coordinator.get("Recommendation")
+    if not isinstance(recommendation, list):
+        raise ValueError("Recommendation must be a list")
+
+
+def extract_coordinator_summary(report: dict[str, Any]) -> dict[str, Any]:
+    """Return the coordinator findings as a flat dictionary for downstream consumers."""
+    validate_investigation_report(report)
+    coordinator = report["investigation_summary"]["coordinator"]
+    return {
+        "Provider": report["Provider"],
+        "Fraud Score": coordinator["Fraud Score"],
+        "Provider Risk": coordinator["Provider Risk"],
+        "Claim Risk": coordinator["Claim Risk"],
+        "Beneficiary Risk": coordinator["Beneficiary Risk"],
+        "Evidence": coordinator["Evidence"],
+        "Recommendation": coordinator["Recommendation"],
+        "Priority": coordinator["Priority"],
+        "Confidence": coordinator["Confidence"],
+    }
+
+
 def save_provider_report(report: dict[str, Any], output_dir: str | Path) -> Path:
     """Persist a single provider investigation report as JSON."""
+    validate_investigation_report(report)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     provider_id = str(report.get("Provider", "unknown"))
     output_path = output_dir / f"{provider_id}_report.json"
     output_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    logger.info("Saving report to %s", output_path)
     return output_path
 
 
 def save_combined_reports(reports: list[dict[str, Any]], output_dir: str | Path) -> Path:
     """Persist the combined investigation report bundle."""
+    for report in reports:
+        validate_investigation_report(report)
+
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     combined_path = output_dir / "investigation_reports.json"
     combined_path.write_text(json.dumps(reports, indent=2), encoding="utf-8")
+    logger.info("Saving combined investigation reports to %s", combined_path)
     return combined_path

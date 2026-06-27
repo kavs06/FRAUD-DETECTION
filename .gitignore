@@ -44,10 +44,13 @@ logs/
 # ==========================================
 # Output Files (Generated Reports)
 # ==========================================
-outputs/
-outputs_test/
 reports/
 narrative_reports/
+outputs/*
+!outputs/.gitkeep
+
+outputs_test/*
+!outputs_test/.gitkeep
 
 # ==========================================
 # Testing
