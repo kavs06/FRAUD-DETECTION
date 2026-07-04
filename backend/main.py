@@ -181,3 +181,10 @@ def chatbot_interaction(request: ChatRequest):
 @app.get("/")
 def read_root():
     return {"message": "Fraud Investigation API is running"}
+
+@app.get("/test-key")
+def test_key():
+    import os
+    return {
+        "gemini_key": os.getenv("GEMINI_API_KEY")
+    }
