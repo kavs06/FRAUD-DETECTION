@@ -12,7 +12,9 @@ import { useAuth } from '../context/AuthContext';
 const ProviderSearch = () => {
   const [providerId, setProviderId] = useState('');
   const [result, setResult] = useState(null);
+  const [investigationResult, setInvestigationResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [investigationLoading, setInvestigationLoading] = useState(false);
 
   const { token } = useAuth();
 
@@ -34,6 +36,26 @@ const ProviderSearch = () => {
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleInvestigate = async () => {
+    if (!providerId) return;
+
+    setInvestigationLoading(true);
+
+    try {
+      const investigateRes = await axios.post(
+        'http://127.0.0.1:8000/investigate',
+        { provider_id: providerId }
+      );
+
+      setInvestigationResult(investigateRes.data);
+    } catch (error) {
+      console.error(error);
+      setInvestigationResult({ error: 'Investigation failed' });
+    } finally {
+      setInvestigationLoading(false);
     }
   };
 
@@ -89,7 +111,46 @@ const ProviderSearch = () => {
               'Analyze Provider'
             )}
           </button>
+
+          <button
+            type="button"
+            onClick={handleInvestigate}
+            disabled={investigationLoading}
+            className="px-8 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white font-bold rounded-2xl transition-all flex items-center justify-center disabled:opacity-50 shadow-lg shadow-orange-500/30 hover:-translate-y-0.5"
+          >
+            {investigationLoading ? (
+              <div className="flex items-center">
+                <Activity className="w-5 h-5 mr-2 animate-spin" />
+                Investigating...
+              </div>
+            ) : (
+              'Investigate'
+            )}
+          </button>
         </form>
+
+        {investigationResult && !investigationResult.error && (
+          <div className="animate-fade-in-up relative z-10 mt-10">
+            <div className="p-8 rounded-3xl border border-amber-100 shadow-xl bg-gradient-to-br from-amber-50 to-white">
+              <h3 className="text-2xl font-black text-slate-800 mb-4">
+                Investigation Report for {investigationResult.Provider}
+              </h3>
+              <p className="text-slate-600 mb-4 font-medium leading-relaxed">
+                The multi-agent investigation completed successfully and returned a coordinator report.
+              </p>
+              <div className="grid md:grid-cols-2 gap-4 text-sm text-slate-700">
+                <div className="rounded-2xl bg-white/80 p-4 border border-white shadow-sm">
+                  <p className="font-semibold text-slate-500 uppercase tracking-wider">Fraud Score</p>
+                  <p className="text-2xl font-black text-slate-800">{investigationResult.fraud_probability}</p>
+                </div>
+                <div className="rounded-2xl bg-white/80 p-4 border border-white shadow-sm">
+                  <p className="font-semibold text-slate-500 uppercase tracking-wider">Coordinator Summary</p>
+                  <p className="text-lg font-bold text-slate-800">{investigationResult.investigation_summary?.coordinator?.['Provider Risk']}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {result && (
           <div className="animate-fade-in-up relative z-10 mt-10">

@@ -10,14 +10,23 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any
+from dotenv import load_dotenv
 
 import joblib
 import pandas as pd
 
 # Import AI modules
+load_dotenv()
 try:
     # Initialize explainability and RAG gemini
-    api_key = os.getenv("GEMINI_API_KEY", "YOUR_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY")
+
+    if not api_key:
+        raise RuntimeError(
+            "GEMINI_API_KEY not found. Please set it in the .env file."
+        )
+
+
     os.environ["GOOGLE_API_KEY"] = api_key
     os.environ["GEMINI_API_KEY"] = api_key
     
@@ -46,7 +55,9 @@ except Exception as e:
 
 # Import and attach auth routes
 from backend.auth import router as auth_router
+from backend.routes.investigation import router as investigation_router
 app.include_router(auth_router)
+app.include_router(investigation_router)
 
 app.add_middleware(
     CORSMiddleware,
