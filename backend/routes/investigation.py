@@ -11,7 +11,14 @@ from services.investigation_service import InvestigationService
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/investigate", tags=["investigation"])
 
-service = InvestigationService()
+_service: InvestigationService | None = None
+
+
+def get_service() -> InvestigationService:
+    global _service
+    if _service is None:
+        _service = InvestigationService()
+    return _service
 
 
 class InvestigationRequest(BaseModel):
@@ -21,7 +28,7 @@ class InvestigationRequest(BaseModel):
 @router.post("")
 def investigate_provider(request: InvestigationRequest) -> dict[str, Any]:
     try:
-        report = service.investigate_provider(request.provider_id)
+        report = get_service().investigate_provider(request.provider_id)
     except ValueError as exc:
         logger.warning("Investigation request failed: %s", exc)
         raise HTTPException(status_code=404, detail=str(exc)) from exc

@@ -7,7 +7,13 @@ from typing import Any
 import joblib
 import pandas as pd
 
+from agents.investigation.base import InvestigationContext
+from agents.investigation.beneficiary_agent import BeneficiaryInvestigationAgent
+from agents.investigation.claim_agent import ClaimInvestigationAgent
+from agents.investigation.provider_agent import ProviderInvestigationAgent
 from crews.fraud_investigation_crew import FraudInvestigationCrew
+from services.agent_registry import AgentRegistry
+from services.investigation_orchestrator import InvestigationOrchestrator
 from utils.investigation_utils import create_probability_frame
 
 logger = logging.getLogger(__name__)
@@ -26,6 +32,12 @@ class InvestigationService:
         self.model = joblib.load(self.model_dir / "logistic_regression.pkl")
         self.scaler = joblib.load(self.model_dir / "scaler.pkl")
         self.feature_names = joblib.load(self.model_dir / "feature_names.pkl")
+        self.orchestrator = InvestigationOrchestrator()
+        self.agent_registry = AgentRegistry()
+        self.agent_registry.register("provider", lambda: ProviderInvestigationAgent())
+        self.agent_registry.register("claim", lambda: ClaimInvestigationAgent())
+        self.agent_registry.register("beneficiary", lambda: BeneficiaryInvestigationAgent())
+        self.reusable_agent_names = ["provider", "claim", "beneficiary"]
 
     def _load_provider_frame(self) -> pd.DataFrame:
         provider_df = pd.read_csv(self.provider_data_path)
@@ -67,5 +79,23 @@ class InvestigationService:
             raise RuntimeError("Investigation crew returned no reports")
 
         report = reports[0]
+        coordinator_payload = report["investigation_summary"]["coordinator"]
+        report["follow_up_steps"] = self.orchestrator.build_follow_up_steps(coordinator_payload)
+
+        context = InvestigationContext(
+            provider_id=provider_id,
+            provider_row=provider_row.iloc[0].to_dict(),
+            cohort_context=coordinator_payload.get("cohort_context", {}),
+            temporal_context=coordinator_payload.get("temporal_context", {}),
+            ml_probability=float(report.get("fraud_probability", 0.0) or 0.0),
+        )
+        reusable_findings: list[dict[str, Any]] = []
+        for agent_name in self.reusable_agent_names:
+            try:
+                agent = self.agent_registry.create(agent_name)
+                reusable_findings.extend(agent.analyze(context))
+            except KeyError:
+                logger.warning("Investigation agent %s is not registered", agent_name)
+        report["reusable_agent_findings"] = reusable_findings
         logger.info("Investigation completed for %s", provider_id)
         return report

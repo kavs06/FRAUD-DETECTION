@@ -2,6 +2,8 @@ import sys
 import unittest
 from pathlib import Path
 
+from services.agent_registry import AgentRegistry
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -17,6 +19,32 @@ class InvestigationServiceTests(unittest.TestCase):
         self.assertIsInstance(report, dict)
         self.assertEqual(report["Provider"], "PRV51001")
         self.assertIn("investigation_summary", report)
+
+    def test_investigation_report_contains_structured_findings(self) -> None:
+        service = InvestigationService(output_dir=str(ROOT / "outputs_test"))
+        report = service.investigate_provider("PRV51001", threshold=0.0)
+
+        coordinator = report["investigation_summary"]["coordinator"]
+        self.assertIn("structured_findings", coordinator)
+        self.assertIsInstance(coordinator["structured_findings"], list)
+        self.assertIn("collaboration_triggers", coordinator)
+        self.assertIn("temporal_context", coordinator)
+        self.assertIn("cohort_context", coordinator)
+        self.assertIn("evidence_fusion", coordinator)
+        self.assertIn("follow_up_steps", report)
+        self.assertIn("reusable_agent_findings", report)
+        self.assertEqual(sorted(service.agent_registry.names()), ["beneficiary", "claim", "provider"])
+        if coordinator["structured_findings"]:
+            finding = coordinator["structured_findings"][0]
+            self.assertIn("title", finding)
+            self.assertIn("fraud_hypothesis", finding)
+            self.assertIn("confidence", finding)
+
+    def test_agent_registry_exposes_default_agents(self) -> None:
+        registry = AgentRegistry()
+        registry.register("provider", lambda: object())
+        registry.register("claim", lambda: object())
+        self.assertEqual(registry.names(), ["claim", "provider"])
 
 
 if __name__ == "__main__":
