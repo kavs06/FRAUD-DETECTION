@@ -1,0 +1,39 @@
+/* ---------- App Layout ---------- */
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #f4f7fb;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.app-container {
+  min-height: 100vh;
+  padding: 30px;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.app-header h1 {
+  margin: 0;
+  color: #1565c0;
+  font-size: 2.3rem;
+}
+
+.app-header p {
+  margin-top: 10px;
+  color: #666;
+  font-size: 1rem;
+}
+
+.chat-container {
+  max-width: 1000px;
+  margin: auto;
+  background: white;
+  border-radius: 18px;
+  padding: 25px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+}
